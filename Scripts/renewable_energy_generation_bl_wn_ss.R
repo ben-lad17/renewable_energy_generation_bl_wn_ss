@@ -9,6 +9,7 @@
 # Description:  Build general layout, add placeholder widgets, pick a theme,
 # and begin populating the app
 #
+# Notes:  # add panels: 1 for map, 1 for graph, 1 for table
 # 
 # Inputs:   
 #         
