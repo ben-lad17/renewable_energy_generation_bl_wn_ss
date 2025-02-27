@@ -9,7 +9,6 @@
 # Description:  Build general layout, add placeholder widgets, pick a theme,
 # and begin populating the app
 #
-# Notes:  
 # 
 # Inputs:   
 #         
