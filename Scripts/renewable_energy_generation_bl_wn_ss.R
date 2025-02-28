@@ -63,23 +63,36 @@ ui = fluidPage(
   titlePanel("Wind and Solar Generation Facilities in the US"),
   
   sidebarLayout(
-    sidebarPanel(
-      wellPanel(
-        "Placeholder Widgets",
-        radioButtons(
-          inputId = "state",
-          label = "Choose State",
-          choices = c("AZ", "CA")
-        ),
-        selectInput(inputId = 'energy_type',
-                    label = 'Select Energy Type',
-                    choices = c("solar", "wind")
+    conditionalPanel(
+      condition = "input.tabset != 'Introduction'",
+      sidebarPanel(
+        wellPanel(
+          "Placeholder Widgets",
+          selectInput(inputId = "state",
+                      label = "Choose State",
+                      choices = sort(unique(solar_2023$state)),
+                      selected = sort(unique(solar_2023$state))[1]
+          ),
+          selectInput(inputId = 'energy_type',
+                      label = 'Select Energy Type',
+                      choices = c("solar", "wind"),
+                      selected = "solar"
+          )
         )
       )
     ),
     
     mainPanel(
       tabsetPanel(
+        tabPanel(
+          "Introduction", 
+          wellPanel(
+            h3("Project Overview"),
+            p("This Shiny app explores wind and solar energy generation across the United States over the past 25 years. 
+               Users can analyze energy generation trends, view summary tables, and explore energy facility locations on an interactive map.")
+          )
+        ),
+        
         tabPanel(
           "Energy Generation Plot", 
           wellPanel(
