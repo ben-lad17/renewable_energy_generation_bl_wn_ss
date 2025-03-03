@@ -17,9 +17,10 @@
 # Outputs:   
 #
 ##################################################################
+# Clean the environment
+rm(list=ls())
 
-
-# load libraries
+# Load libraries
 library(tidyverse)
 library(shiny)
 library(here)
@@ -29,14 +30,28 @@ library(janitor)
 library(leaflet)
 library(bslib)
 
-# load data (for now, just one sample file)
-solar_2023 = read_xlsx(here("Data/eia8602023", "3_3_Solar_Y2023.xlsx"), skip = 1) |>
-  clean_names() |>
-  mutate(energy_type = "solar")
+# Load data 
+solar_2023 = read.csv(here("Output", "eia_solar_2016-2023.csv")) |>
+  filter(year==2023)
+wind_2023 = read.csv(here("Output", "eia_wind_2016-2023.csv")) |>
+  filter(year==2023)
 
-# create user interface
-ui = fluidPage(
-  theme = bs_theme(  # Apply theme
+
+# Combine datasets and add energy_type column
+energy_data <- bind_rows(
+  solar_2023 |> mutate(energy_type = "solar"),
+  wind_2023 |> mutate(energy_type = "wind")
+)
+
+year_range <- range(energy_data$operating_year, na.rm = TRUE)
+
+cv_accuracy_df = read.csv(here("Output", "cv_accuracy_df.csv")) |>
+  clean_names()
+
+# Create user interface
+ui = navbarPage(
+  title = "Wind and Solar Generation in the US",
+  theme = bs_theme( 
     version = 5, 
     bootswatch = "flatly",  
     primary = "#2c7c59",  
@@ -44,102 +59,121 @@ ui = fluidPage(
     success = "#62c462"
   ),
   
-  tags$head(
-    tags$style(HTML("
-      body {
-        background-image: url('solar_background.jpg'); 
-        background-size: cover;
-        background-attachment: fixed;
-        background-position: center;
-      }
-      .panel {
-        background-color: rgba(255, 255, 255, 0.8); /* Slight transparency */
-        padding: 15px;
-        border-radius: 10px;
-      }
-    "))
+  # Introduction Panel
+  tabPanel("Introduction",
+           fluidPage(
+             wellPanel(
+               h3("Project Overview"),
+               p("This Shiny app explores wind and solar energy generation across the United States over the past 25 years. 
+       Users can analyze energy generation trends, view summary tables, and explore energy facility locations on an interactive map.")
+             ),
+             
+             # Blank Row between summary and citation
+             br(),  # Adds a blank line
+             
+             # Citation Section
+             wellPanel(
+               h4("Data Citation:"),
+               p("U.S. Energy Information Administration (EIA). Electricity Data: EIA-860 Detailed Data Files.", 
+                 "U.S. Energy Information Administration. Retrieved January 30th, 2025, from https://www.eia.gov/electricity/data/eia860/
+")
+             )
+           )
   ),
   
-  titlePanel("Wind and Solar Generation Facilities in the US"),
+  # Energy Generation Plot Panel
+  tabPanel("Energy Generation Plot",
+           sidebarLayout(
+             sidebarPanel(
+               selectInput("state_plot", "Choose State", choices = sort(unique(solar_2023$state))),
+               checkboxGroupInput("energy_type_plot", "Select Energy Type", 
+                                  choices = c("solar", "wind"),
+                                  selected = c("solar", "wind")) 
+             ),
+             mainPanel(
+               plotOutput("solar_plot")
+             )
+           )
+  ),
   
-  sidebarLayout(
-    conditionalPanel(
-      condition = "input.tabset != 'Introduction'",
-      sidebarPanel(
-        wellPanel(
-          "Placeholder Widgets",
-          selectInput(inputId = "state",
-                      label = "Choose State",
-                      choices = sort(unique(solar_2023$state)),
-                      selected = sort(unique(solar_2023$state))[1]
-          ),
-          selectInput(inputId = 'energy_type',
-                      label = 'Select Energy Type',
-                      choices = c("solar", "wind"),
-                      selected = "solar"
-          )
-        )
-      )
-    ),
-    
-    mainPanel(
-      tabsetPanel(
-        tabPanel(
-          "Introduction", 
-          wellPanel(
-            h3("Project Overview"),
-            p("This Shiny app explores wind and solar energy generation across the United States over the past 25 years. 
-               Users can analyze energy generation trends, view summary tables, and explore energy facility locations on an interactive map.")
-          )
-        ),
-        
-        tabPanel(
-          "Energy Generation Plot", 
-          wellPanel(
-            plotOutput(outputId = 'solar_plot')
-          )
-        ),
-        
-        tabPanel(
-          "Energy Summary Table", 
-          wellPanel(
-            tableOutput(outputId = 'solar_table')
-          )
-        ),
-        
-        tabPanel(
-          "Map of Energy Locations", 
-          wellPanel(
-            leafletOutput("map")
-          )
-        )
-      )
-    )
+  # Energy Summary Table Panel
+  tabPanel("Energy Summary Table",
+           sidebarLayout(
+             sidebarPanel(
+               radioButtons("energy_type_table", "Select Energy Type", 
+                            choices = c("solar", "wind"),
+                            selected = "solar")
+             ),
+             mainPanel(
+               tableOutput("solar_table")
+             )
+           )
+  ),
+  
+  # Map Panel
+  tabPanel("Map of Energy Locations",
+           sidebarLayout(
+             sidebarPanel(
+               sliderInput("year_range", "Select Operating Year Range:",
+                           min = year_range[1], max = year_range[2], 
+                           value = year_range, step = 1, sep = "")
+             ),
+             mainPanel(
+               h3("New Project Installations"),
+               leafletOutput("map")
+             )
+           )
+  ),
+  
+  
+  tabPanel("Cross Validation Results",
+           sidebarLayout(
+             radioButtons("model_choice", "Select Model", 
+                          choices = c("Model 1: All variables", "Model 2: No sector", "Model 3: No sector or year"),
+                          selected = "Model 1: All variables"),
+             mainPanel(
+               tableOutput("cv_table")
+             )
+           )
   )
+  
 )
-
-# create server function
-server = function(input, output) {
-  state_select = reactive(
-    {
-      state_df = solar_2023 |>
-        filter(state == input$state) |>
-        filter(energy_type == input$energy_type)
-    }
-  )
   
-  output$solar_plot = renderPlot({
-    ggplot(data = state_select()) +
-      geom_point(aes(x = operating_year, y = nameplate_capacity_mw))
+  
+  
+
+
+# Create server function
+server = function(input, output) {
+  
+  # Reactive data filtering for plot
+  state_select_plot = reactive({
+    energy_data |>
+      filter(state == input$state_plot) |>
+      filter(energy_type %in% input$energy_type_plot)
   })
   
+  output$solar_plot = renderPlot({
+    ggplot(data = state_select_plot()) +
+      geom_point(aes(x = operating_year, y = nameplate_capacity_mw, color=energy_type)) +
+      scale_color_manual(
+        name = "Energy Type", 
+        values = c("solar" = "orange", "wind" = "lightblue")  
+      ) +
+      labs(x = "Operating Year", y = "Nameplate Capacity", 
+           title = "Operating Year and Capacity of Solar and Wind Generation Facilities") +
+      theme_bw()
+  })
+  
+  
+  # sector output table
   energy_sum_table = reactive({
-    solar_summary_df = solar_2023 |>
-      filter(state == input$state) |>
-      filter(energy_type == input$energy_type) |>
-      group_by(state) |>
+    energy_data |>
+      filter(energy_type == input$energy_type_table) |>
+      group_by(sector_name) |>
       summarize(
-        mean_nameplate_capacity = mean(nameplate_capacity_mw, na.rm = TRUE),
+        total_nameplate_capacity = sum(nameplate_capacity_mw, na.rm = TRUE),
+        mean_nameplate_capacity = mean(nameplate_capacity_mw, na.rm = TRUE)
       )
   })
   
@@ -147,13 +181,52 @@ server = function(input, output) {
     energy_sum_table()
   })
   
-  # Create a placeholder Leaflet map
+  
+  # reactive data filtering for map
+  filtered_data_map <- reactive({
+    energy_data |>
+      filter(operating_year >= input$year_range[1], 
+             operating_year <= input$year_range[2])
+  })
+  
+  # output map
   output$map = renderLeaflet({
     leaflet() |>
-      addProviderTiles(providers$CartoDB.Positron) |>  # Light-themed base map
-      setView(lng = -98.5, lat = 39.8, zoom = 4)  # Centered on the US
+      addProviderTiles(providers$CartoDB.Positron) |>
+      setView(lng = -98.5, lat = 39.8, zoom = 4)
   })
+  
+  # Update Map When Selection Changes
+  observe({
+    data <- filtered_data_map()
+
+    leafletProxy("map", data = data) |>
+      clearMarkers() |>
+      addCircleMarkers(
+        lng = ~longitude, lat = ~latitude,
+        radius = 1,
+        color = ~ifelse(energy_type == "solar", "orange", "lightblue"),
+        popup = ~paste0("<b>Facility:</b> ", utility_name, "<br>",
+                        "<b>Operating Year:</b> ", operating_year)
+      ) |>
+      setView(lng = -98.5, lat = 39.8, zoom = 4)
+  })
+  
+  
+  
+  # cross validation results table
+  cv_results_table = reactive({
+    req(input$model_choice)  # Ensure input is available
+    cv_accuracy_df |>
+      filter(model == input$model_choice) 
+  })
+  
+  output$cv_table = renderTable({
+    cv_results_table()
+  })
+  
+  
 }
 
-# combine into app:
+# Combine into Shiny app
 shinyApp(ui = ui, server = server)

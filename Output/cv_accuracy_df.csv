@@ -1,0 +1,4 @@
+Model,Total_Observations,Correctly_Classified,Incorrectly_Classified,Percent_Correctly
+Model 1: All variables,7861,7408,453,94.2373743798499
+Model 2: No sector,7861,7398,463,94.11016410125939
+Model 3: No sector or year,7861,7005,856,89.11080015265233
