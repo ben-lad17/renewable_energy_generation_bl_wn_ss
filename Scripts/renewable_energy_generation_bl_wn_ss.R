@@ -182,36 +182,57 @@ server = function(input, output) {
   })
   
   
-  # reactive data filtering for map
+  # Reactive data filtering for map
   filtered_data_map <- reactive({
     energy_data |>
       filter(operating_year >= input$year_range[1], 
              operating_year <= input$year_range[2])
   })
   
-  # output map
-  output$map = renderLeaflet({
+  # Initial Map Setup (Only runs once)
+  output$map <- renderLeaflet({
     leaflet() |>
       addProviderTiles(providers$CartoDB.Positron) |>
-      setView(lng = -98.5, lat = 39.8, zoom = 4)
+      setView(lng = -98.5, lat = 39.8, zoom = 4) |>
+      
+      # Custom Legend using HTML
+      addControl(
+        html = "
+    <div style='background-color: white; padding: 8px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0,0,0,0.2);'>
+      <strong>Energy Type</strong><br>
+      <svg width='20' height='20'><circle cx='10' cy='10' r='6' stroke='black' stroke-width='1.5' fill='lightblue' /></svg> Wind<br>
+      <svg width='20' height='20'><circle cx='10' cy='10' r='6' stroke='black' stroke-width='1.5' fill='orange' /></svg> Solar
+    </div>",
+        position = "bottomright"
+      )
   })
   
-  # Update Map When Selection Changes
+  # Observe updates and refresh the data when year range changes
   observe({
-    data <- filtered_data_map()
-
+    data <- filtered_data_map()  # Get filtered dataset
+    
     leafletProxy("map", data = data) |>
-      clearMarkers() |>
+      clearMarkerClusters() |>  # Ensure old clusters are removed
+      clearMarkers() |>  # Clear old markers
+      clearShapes() |>  # Remove any lingering shapes
+      
+      # Add Clustered Points for Facilities
       addCircleMarkers(
         lng = ~longitude, lat = ~latitude,
-        radius = 1,
-        color = ~ifelse(energy_type == "solar", "orange", "lightblue"),
+        radius = 5,  
+        stroke = TRUE,
+        weight = 1.5,  
+        color = "black",  
+        fillColor = ~ifelse(energy_type == "solar", "orange", "lightblue"),
+        fillOpacity = 0.8,  
         popup = ~paste0("<b>Facility:</b> ", utility_name, "<br>",
-                        "<b>Operating Year:</b> ", operating_year)
-      ) |>
-      setView(lng = -98.5, lat = 39.8, zoom = 4)
+                        "<b>Operating Year:</b> ", operating_year),
+        clusterOptions = markerClusterOptions(
+          disableClusteringAtZoom = 9,  
+          showCoverageOnHover = FALSE  
+        )  
+      )
   })
-  
   
   
   # cross validation results table
