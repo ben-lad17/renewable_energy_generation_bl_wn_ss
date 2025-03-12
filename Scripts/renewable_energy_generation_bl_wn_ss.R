@@ -39,8 +39,8 @@ wind_2023 = read.csv(here("Output", "eia_wind_2016-2023.csv")) |>
 
 # Combine datasets and add energy_type column
 energy_data <- bind_rows(
-  solar_2023 |> mutate(energy_type = "solar"),
-  wind_2023 |> mutate(energy_type = "wind")
+  solar_2023 |> mutate(energy_type = "Solar"),
+  wind_2023 |> mutate(energy_type = "Wind")
 )
 
 year_range <- range(energy_data$operating_year, na.rm = TRUE)
@@ -87,8 +87,8 @@ ui = navbarPage(
              sidebarPanel(
                selectInput("state_plot", "Choose State", choices = sort(unique(solar_2023$state))),
                checkboxGroupInput("energy_type_plot", "Select Energy Type", 
-                                  choices = c("solar", "wind"),
-                                  selected = c("solar", "wind")) 
+                                  choices = c("Solar", "Wind"),
+                                  selected = c("Solar", "Wind")) 
              ),
              mainPanel(
                plotOutput("solar_plot")
@@ -101,8 +101,8 @@ ui = navbarPage(
            sidebarLayout(
              sidebarPanel(
                radioButtons("energy_type_table", "Select Energy Type", 
-                            choices = c("solar", "wind"),
-                            selected = "solar")
+                            choices = c("Solar", "Wind"),
+                            selected = "Solar")
              ),
              mainPanel(
                tableOutput("solar_table")
@@ -158,11 +158,13 @@ server = function(input, output) {
       geom_point(aes(x = operating_year, y = nameplate_capacity_mw, color=energy_type)) +
       scale_color_manual(
         name = "Energy Type", 
-        values = c("solar" = "orange", "wind" = "lightblue")  
+        values = c("Solar" = "orange", "Wind" = "lightblue")  
       ) +
       labs(x = "Operating Year", y = "Nameplate Capacity", 
            title = "Operating Year and Capacity of Solar and Wind Generation Facilities") +
-      theme_bw()
+      theme_bw() +
+      theme(legend.text = element_text(size = 12),  # Increase legend text size
+            legend.title = element_text(size = 14))  # Increase legend title size
   })
   
   
@@ -223,7 +225,7 @@ server = function(input, output) {
         stroke = TRUE,
         weight = 1.5,  
         color = "black",  
-        fillColor = ~ifelse(energy_type == "solar", "orange", "lightblue"),
+        fillColor = ~ifelse(energy_type == "Solar", "orange", "lightblue"),
         fillOpacity = 0.8,  
         popup = ~paste0("<b>Facility:</b> ", utility_name, "<br>",
                         "<b>Operating Year:</b> ", operating_year),
