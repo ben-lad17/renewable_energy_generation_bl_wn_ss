@@ -64,8 +64,21 @@ ui = navbarPage(
            fluidPage(
              wellPanel(
                h3("Project Overview"),
-               p("This Shiny app explores wind and solar energy generation across the United States over the past 25 years. 
-       Users can analyze energy generation trends, view summary tables, and explore energy facility locations on an interactive map.")
+               p("This Shiny app provides an interactive exploration of wind and solar energy generation across the United States over the past 25 years. 
+               Users can analyze trends in energy generation, compare different energy sectors, and visualize facility locations on a dynamic map."),
+               h4("How to Use This App:"),
+               p("Each panel of the app provides different insights into wind and solar energy generation:"),
+               
+               tags$ul(
+                 tags$li(strong("Energy Generation Plot:"), 
+                         "Displays a scatterplot showing the operating year and capacity of wind and solar facilities in a selected state. Users can filter by energy type."),
+                 tags$li(strong("Energy Summary Table:"), 
+                         "Presents a summary table of total and average capacity for different energy sectors. The sidebar includes sector descriptions for reference."),
+                 tags$li(strong("Map of Energy Locations:"), 
+                         "An interactive map displaying the locations of wind and solar energy facilities. Users can filter by operating year and select facilites on the map to view facility name and operating year"),
+                 tags$li(strong("Cross-Validation Results:"), 
+                         "Shows model validation results comparing different predictive models for energy capacity. Users can select models to view performance metrics.")
+               )
              ),
              
              # Blank Row between summary and citation
@@ -75,11 +88,12 @@ ui = navbarPage(
              wellPanel(
                h4("Data Citation:"),
                p("U.S. Energy Information Administration (EIA). Electricity Data: EIA-860 Detailed Data Files.", 
-                 "U.S. Energy Information Administration. Retrieved January 30th, 2025, from https://www.eia.gov/electricity/data/eia860/
-")
+                 "U.S. Energy Information Administration. Retrieved January 30th, 2025, from ", 
+                 tags$a(href = "https://www.eia.gov/electricity/data/eia860/", "EIA Data Portal")
+               )
              )
            )
-  ),
+),
   
   # Energy Generation Plot Panel
   tabPanel("Energy Generation Plot",
@@ -97,7 +111,7 @@ ui = navbarPage(
   ),
   
   # Energy Summary Table Panel
-  tabPanel("Energy Summary Table",
+  tabPanel("Sector Summary Table",
            sidebarLayout(
              sidebarPanel(
                radioButtons("energy_type_table", "Select Energy Type", 
@@ -121,32 +135,63 @@ ui = navbarPage(
            )
   ),
   
-  # Map Panel
-  tabPanel("Map of Energy Locations",
-           sidebarLayout(
-             sidebarPanel(
-               sliderInput("year_range", "Select Operating Year Range:",
-                           min = year_range[1], max = year_range[2], 
-                           value = year_range, step = 1, sep = "")
+# Map Panel
+tabPanel("Facility Locations",
+         sidebarLayout(
+           sidebarPanel(
+             tags$head(
+               tags$style(HTML("
+                 .irs-bar, .irs-bar-edge {
+                   background: #2c7c59 !important;  /* Change slider bar color */
+                   border-color: #2c7c59 !important;
+                 }
+                 .irs-single, .irs-to, .irs-from {
+                   background: #2c7c59 !important; /* Change handle color */
+                   border-color: #2c7c59 !important;
+                 }
+                 .irs-slider {
+                   background: #2c7c59 !important; /* Change slider knob color */
+                   border-color: #2c7c59 !important;
+                 }
+               "))
              ),
-             mainPanel(
-               h3("New Project Installations"),
-               leafletOutput("map")
-             )
+             sliderInput("year_range", "Select Operating Year Range:",
+                         min = year_range[1], max = year_range[2], 
+                         value = year_range, step = 1, sep = ""),
+             
+             # Add Checkbox Input for Selecting Energy Type
+             checkboxGroupInput("energy_type_map", "Select Energy Type:",
+                                choices = c("Solar", "Wind"),
+                                selected = c("Solar", "Wind"))  # Default: Both selected
+           ),
+           mainPanel(
+             h3("New Project Installations"),
+             leafletOutput("map")
            )
+         )
   ),
   
   
-  tabPanel("Cross Validation Results",
-           sidebarLayout(
-             radioButtons("model_choice", "Select Model", 
-                          choices = c("Model 1: All variables", "Model 2: No sector", "Model 3: No sector or year"),
-                          selected = "Model 1: All variables"),
-             mainPanel(
-               tableOutput("cv_table")
-             )
-           )
-  )
+tabPanel("Cross Validation Results",
+         fluidPage(
+           h3("Logistic Regression Model for Facility Type Prediction"),
+           wellPanel(
+             p("This analysis applies a logistic binary regression model to predict whether a facility is classified as a Wind or Solar generation facility. 
+                We used a 10-fold cross-validation approach to evaluate model performance. 
+                The dataset includes various predictors related to facility characteristics and operational details."),
+             
+             h4("Model Equations:"),
+             withMathJax(
+               p("Model 1: $$\\text{logit}(P(Y = \\text{Wind})) = \\beta_1 (\\text{Capacity}) + \\beta_2 (\\text{State}) + \\beta_3 (\\text{Operating Year}) + \\beta_4 (\\text{Sector})$$"),
+               p("Model 2: $$\\text{logit}(P(Y = \\text{Wind})) = \\beta_1 (\\text{Capacity}) + \\beta_2 (\\text{State}) + \\beta_3 (\\text{Operating Year})$$"),
+               p("Model 3: $$\\text{logit}(P(Y = \\text{Wind})) = \\beta_1 (\\text{Capacity}) + \\beta_2 (\\text{State})$$")
+             ),
+           ),
+           
+           h3("Model Comparison"),
+           tableOutput("cv_table")  # Display all model results
+         )
+)
   
 )
   
@@ -166,16 +211,24 @@ server = function(input, output) {
   
   output$solar_plot = renderPlot({
     ggplot(data = state_select_plot()) +
-      geom_point(aes(x = operating_year, y = nameplate_capacity_mw, color=energy_type)) +
+      geom_point(aes(x = operating_year, y = nameplate_capacity_mw, color=energy_type), 
+                 size = 3) +  # Increase point size for better visibility
       scale_color_manual(
         name = "Energy Type", 
         values = c("Solar" = "orange", "Wind" = "lightblue")  
       ) +
-      labs(x = "Operating Year", y = "Nameplate Capacity", 
+      labs(x = "Operating Year", y = "Nameplate Capacity (MW)", 
            title = "Operating Year and Capacity of Solar and Wind Generation Facilities") +
       theme_bw() +
-      theme(legend.text = element_text(size = 12),  # Increase legend text size
-            legend.title = element_text(size = 14))  # Increase legend title size
+      theme(
+        plot.title = element_text(size = 20),  # Increase title size
+        axis.title.x = element_text(size = 16),  # Increase x-axis title size
+        axis.title.y = element_text(size = 16),  # Increase y-axis title size
+        axis.text.x = element_text(size = 14),  # Increase x-axis tick labels
+        axis.text.y = element_text(size = 14),  # Increase y-axis tick labels
+        legend.text = element_text(size = 14),  # Increase legend text size
+        legend.title = element_text(size = 16)  # Increase legend title size
+      )
   })
   
   
@@ -204,7 +257,8 @@ server = function(input, output) {
   filtered_data_map <- reactive({
     energy_data |>
       filter(operating_year >= input$year_range[1], 
-             operating_year <= input$year_range[2])
+             operating_year <= input$year_range[2]) |>
+      filter(energy_type %in% input$energy_type_map)  # Apply Energy Type Filter
   })
   
   # Initial Map Setup (Only runs once)
@@ -225,7 +279,7 @@ server = function(input, output) {
       )
   })
   
-  # Observe updates and refresh the data when year range changes
+  # Observe updates and refresh the data when year range or energy type changes
   observe({
     data <- filtered_data_map()  # Get filtered dataset
     
@@ -252,18 +306,26 @@ server = function(input, output) {
       )
   })
   
+  # Prepare the model results table with updated row and column names
+  cv_results_table <- cv_accuracy_df %>%
+    select(model, total_observations, correctly_classified, incorrectly_classified, percent_correctly) %>%
+    mutate(model = case_when(
+      model == "Model 1: All variables" ~ "Model 1",
+      model == "Model 2: No sector" ~ "Model 2",
+      model == "Model 3: No sector or year" ~ "Model 3"
+    )) %>%
+    rename(
+      Model = model,
+      `Total Observations` = total_observations,
+      `Correctly Classified` = correctly_classified,
+      `Incorrectly Classified` = incorrectly_classified,
+      `Percent Correctly Classified` = percent_correctly
+    )
   
-  # cross validation results table
-  cv_results_table = reactive({
-    req(input$model_choice)  # Ensure input is available
-    cv_accuracy_df |>
-      filter(model == input$model_choice) 
-  })
-  
-  output$cv_table = renderTable({
-    cv_results_table()
-  })
-  
+  # Render the updated table
+  output$cv_table <- renderTable({
+    cv_results_table
+  }, striped = TRUE, bordered = TRUE, hover = TRUE)
   
 }
 
