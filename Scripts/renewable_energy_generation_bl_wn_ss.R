@@ -102,10 +102,21 @@ ui = navbarPage(
              sidebarPanel(
                radioButtons("energy_type_table", "Select Energy Type", 
                             choices = c("Solar", "Wind"),
-                            selected = "Solar")
+                            selected = "Solar"),
+               
+               # Sector Descriptions
+               wellPanel(
+                 p(strong("Commercial CHP:"), " Combined Heat and Power (CHP) plants serving commercial facilities."),
+                 p(strong("Commercial Non-CHP:"), " Non-CHP generation serving commercial entities."),
+                 p(strong("Electric Utility:"), " Traditional utility companies that generate and distribute electricity."),
+                 p(strong("IPP CHP:"), " Independent Power Producers (IPP) with CHP generation."),
+                 p(strong("IPP Non-CHP:"), " Independent Power Producers without CHP generation."),
+                 p(strong("Industrial CHP:"), " Industrial facilities using Combined Heat and Power for self-generation."),
+                 p(strong("Industrial Non-CHP:"), " Industrial facilities generating power without CHP.")
+               )
              ),
              mainPanel(
-               tableOutput("solar_table")
+               tableOutput("solar_table"),
              )
            )
   ),
