@@ -176,6 +176,11 @@ server = function(input, output) {
       summarize(
         total_nameplate_capacity = sum(nameplate_capacity_mw, na.rm = TRUE),
         mean_nameplate_capacity = mean(nameplate_capacity_mw, na.rm = TRUE)
+      ) |>
+      rename(
+        Sector = sector_name,
+        `Total Capacity (MW)` = total_nameplate_capacity,
+        `Mean Capacity (MW)` = mean_nameplate_capacity
       )
   })
   
